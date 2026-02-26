@@ -245,18 +245,49 @@ func LoadConfig() (*Config, error) {
 	return config, nil
 }
 
-// Load loads the configuration from environment variables and TOML files
+// Load loads the configuration from environment variables and TOML files.
+// The lifecycle follows three distinct phases: load, merge defaults, validate.
 func Load() (*Config, error) {
-	cfg := &Config{}
-	parsers := []Parser{EnvParser{}, fileParser{}}
-	for _, parser := range parsers {
-		if err := parser.Parse(cfg); err != nil {
-			return nil, err
+	// Phase 1: Load from sources (env vars, then TOML file).
+	cfg := &Config{
+		RpcUrl:         getEnv("ERST_RPC_URL", ""),
+		Network:        Network(getEnv("ERST_NETWORK", "")),
+		SimulatorPath:  getEnv("ERST_SIMULATOR_PATH", ""),
+		LogLevel:       getEnv("ERST_LOG_LEVEL", ""),
+		CachePath:      getEnv("ERST_CACHE_PATH", ""),
+		RPCToken:       getEnv("ERST_RPC_TOKEN", ""),
+		CrashEndpoint:  getEnv("ERST_CRASH_ENDPOINT", ""),
+		CrashSentryDSN: getEnv("ERST_SENTRY_DSN", ""),
+		RequestTimeout: defaultRequestTimeout,
+	}
+
+	// ERST_REQUEST_TIMEOUT is an integer env var; parse it explicitly.
+	if v := os.Getenv("ERST_REQUEST_TIMEOUT"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.RequestTimeout = n
 		}
 	}
 
-	ConfigDefaultsAssigner{}.Apply(cfg)
+	switch strings.ToLower(os.Getenv("ERST_CRASH_REPORTING")) {
+	case "1", "true", "yes":
+		cfg.CrashReporting = true
+	}
 
+	if urlsEnv := os.Getenv("ERST_RPC_URLS"); urlsEnv != "" {
+		cfg.RpcUrls = strings.Split(urlsEnv, ",")
+		for i := range cfg.RpcUrls {
+			cfg.RpcUrls[i] = strings.TrimSpace(cfg.RpcUrls[i])
+		}
+	}
+
+	if err := cfg.loadFromFile(); err != nil {
+		return nil, err
+	}
+
+	// Phase 2: Merge defaults for any fields still unset.
+	cfg.MergeDefaults()
+
+	// Phase 3: Validate.
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -403,12 +434,23 @@ func SaveConfig(config *Config) error {
 }
 
 func (c *Config) Validate() error {
-	validator := NewCompositeValidator(
-		RequiredFieldsValidator{},
-		NetworkValidator{},
-		RequestTimeoutValidator{},
-	)
-	return validator.Validate(c)
+	return RunValidators(c, DefaultValidators())
+}
+
+// MergeDefaults fills zero-value fields with their defaults.
+func (c *Config) MergeDefaults() {
+	if c.RpcUrl == "" {
+		c.RpcUrl = defaultConfig.RpcUrl
+	}
+	if c.Network == "" {
+		c.Network = defaultConfig.Network
+	}
+	if c.LogLevel == "" {
+		c.LogLevel = defaultConfig.LogLevel
+	}
+	if c.CachePath == "" {
+		c.CachePath = defaultConfig.CachePath
+	}
 }
 
 func (c *Config) NetworkURL() string {
@@ -431,6 +473,19 @@ func (c *Config) String() string {
 		"Config{RPC: %s, Network: %s, LogLevel: %s, CachePath: %s}",
 		c.RpcUrl, c.Network, c.LogLevel, c.CachePath,
 	)
+}
+
+func getEnv(key, defaultValue string) string {
+	// Only allow environment variables that are explicitly namespaced with ERST_
+	if !strings.HasPrefix(key, "ERST_") {
+		return defaultValue
+	}
+
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+
+	return defaultValue
 }
 
 func DefaultConfig() *Config {
