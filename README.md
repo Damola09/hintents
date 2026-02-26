@@ -155,10 +155,12 @@ Docker images are available for both `amd64` and `arm64` architectures. See [doc
 #### Option 2: Build from Source
 
 1.  Clone the repo:
+
     ```bash
     git clone https://github.com/dotandev/hintents.git
     cd hintents
     ```
+
 2.  Install dependencies:
     ```bash
     go mod download
