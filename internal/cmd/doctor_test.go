@@ -189,3 +189,37 @@ func TestDoctorCommand(t *testing.T) {
 		t.Error("doctor command should have --verbose flag")
 	}
 }
+
+// TestDoctorWithFix verifies --fix flag is recognized
+func TestDoctorWithFix(t *testing.T) {
+	cmd := doctorCmd
+	cmd.Flags().Set("fix", "true")
+	
+	fix, _ := cmd.Flags().GetBool("fix")
+	if !fix {
+		t.Fatal("--fix flag not recognized")
+	}
+}
+
+// TestDoctorWithYes verifies --yes flag is recognized
+func TestDoctorWithYes(t *testing.T) {
+	cmd := doctorCmd
+	cmd.Flags().Set("yes", "true")
+	
+	yes, _ := cmd.Flags().GetBool("yes")
+	if !yes {
+		t.Fatal("--yes flag not recognized")
+	}
+}
+
+// TestDependencyStatusFixable verifies Fixable field
+func TestDependencyStatusFixable(t *testing.T) {
+	dep := DependencyStatus{
+		Name:    "Test Dependency",
+		Fixable: true,
+	}
+	
+	if !dep.Fixable {
+		t.Fatal("Fixable field not set correctly")
+	}
+}
