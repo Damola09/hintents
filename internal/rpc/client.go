@@ -108,6 +108,11 @@ func (f RoundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return f(req)
 }
 
+// HTTPClient is an interface that matches http.Client.
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 // Client handles interactions with the Stellar Network
 type Client struct {
 	Horizon         horizonclient.ClientInterface
@@ -117,7 +122,7 @@ type Client struct {
 	AltURLs         []string
 	currIndex       int
 	mu              sync.RWMutex
-	httpClient      *http.Client
+	httpClient      HTTPClient
 	token           string // stored for reference, not logged
 	Config          NetworkConfig
 	CacheEnabled    bool
@@ -326,7 +331,7 @@ func (c *Client) attempts() int {
 	return len(c.AltURLs)
 }
 
-func (c *Client) getHTTPClient() *http.Client {
+func (c *Client) getHTTPClient() HTTPClient {
 	if c.httpClient != nil {
 		return c.httpClient
 	}
@@ -1440,7 +1445,7 @@ func (c *Client) postRequest(ctx context.Context, payload interface{}, result in
 	req.Header.Set("Content-Type", "application/json")
 
 	// Use the client's internal httpClient
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.getHTTPClient().Do(req)
 	if err != nil {
 		return fmt.Errorf("http request failed: %w", err)
 	}
