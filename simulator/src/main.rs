@@ -5,6 +5,7 @@
 
 mod config;
 mod debug_host_fn;
+mod events;
 mod gas_optimizer;
 mod git_detector;
 mod runner;
@@ -298,6 +299,8 @@ fn categorize_events(events: &soroban_env_host::events::Events) -> Vec<Categoriz
             };
 
             let wasm_instruction = extract_wasm_instruction(&topics, &data);
+            let metadata = events::build_snapshot_metadata(0, topics.len() as u32);
+            let snapshot_id = Some(metadata.id.clone());
             CategorizedEvent {
                 category,
                 event: DiagnosticEvent {
@@ -315,6 +318,8 @@ fn categorize_events(events: &soroban_env_host::events::Events) -> Vec<Categoriz
                     data,
                     wasm_instruction,
                     in_successful_contract_call: !e.failed_call,
+                    snapshot_id,
+                    snapshot_metadata: Some(metadata),
                 },
             }
         })
@@ -630,10 +635,10 @@ fn main() {
 
     match result {
         Ok(Ok(exec_logs)) => {
-            let (events, _diag_evs): (Vec<String>, Vec<DiagnosticEvent>) = match host.get_events() {
+            let (events, diagnostic_events): (Vec<String>, Vec<DiagnosticEvent>) =
+                match host.get_events() {
                 Ok(evs) => {
-                    let raw_events: Vec<String> =
-                        (evs.0).iter().map(|e| format!("{:?}", e)).collect();
+                    let mut raw_events: Vec<String> = Vec::with_capacity(evs.0.len());
                     let diag_events: Vec<DiagnosticEvent> = (evs.0)
                         .iter()
                         .map(|event| {
@@ -662,12 +667,17 @@ fn main() {
                             };
 
                             let wasm_instruction = extract_wasm_instruction(&topics, &data);
+                            let metadata =
+                                events::build_snapshot_metadata(cpu_insns, topics.len() as u32);
+                            raw_events.push(format!("{:?} [snapshot_id={}]", event, metadata.id));
                             DiagnosticEvent {
                                 event_type,
                                 contract_id,
                                 topics,
                                 data,
                                 in_successful_contract_call: !event.failed_call,
+                                snapshot_id: Some(metadata.id.clone()),
+                                snapshot_metadata: Some(metadata),
                                 wasm_instruction,
                             }
                         })
@@ -692,6 +702,11 @@ fn main() {
                 format!("CPU Instructions Used: {}", cpu_insns),
                 format!("Memory Bytes Used: {}", mem_bytes),
             ];
+            if let Some(first) = diagnostic_events.first() {
+                if let Some(snapshot_id) = &first.snapshot_id {
+                    final_logs.push(format!("First linked SnapshotID: {snapshot_id}"));
+                }
+            }
             let contract_debug_logs: Vec<String> = match host.get_events() {
                 Ok(ref evs) => debug_host_fn::extract_debug_logs(evs)
                     .into_iter()
