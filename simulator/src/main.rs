@@ -1434,9 +1434,7 @@ mod tests {
             last_modified_ledger_seq: 99,
             data: LedgerEntryData::ContractData(ContractDataEntry {
                 ext: soroban_env_host::xdr::ExtensionPoint::V0,
-                contract: ScAddress::Contract(soroban_env_host::xdr::ContractId(
-                    contract_id,
-                )),
+                contract: ScAddress::Contract(soroban_env_host::xdr::ContractId(contract_id)),
                 key: ScVal::U32(5),
                 durability: ContractDataDurability::Persistent,
                 val: ScVal::U64(9),

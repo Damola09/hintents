@@ -536,7 +536,10 @@ mod tests {
     fn test_get_missing() {
         let (cache, _temp) = create_test_cache();
 
-        let result = cache.get("nonexistent_hash_1_234_567_8901_234_567_8901_234_567_89012", false);
+        let result = cache.get(
+            "nonexistent_hash_1_234_567_8901_234_567_8901_234_567_89012",
+            false,
+        );
         assert!(result.is_none());
     }
 
