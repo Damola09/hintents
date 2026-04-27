@@ -248,24 +248,20 @@ func (t *Tracker) recordReplayEvent(accountID string, w *ReplayAttackWarning) {
 	})
 }
 
-// isSACContract returns true when contractID is a known Stellar Asset Contract
-// or when the method name matches the SAC interface.
+// isSACContract returns true only when contractID is a known built-in
+// Stellar Asset Contract. Method names are not used for classification,
+// because arbitrary custom contracts can expose SAC-like methods.
 func isSACContract(contractID, method string) (bool, string) {
 	if label, ok := knownSACContracts[contractID]; ok {
 		return true, label
 	}
-	for _, sig := range sacMethodSignatures {
-		if strings.EqualFold(method, sig) {
-			return true, "unknown SAC asset"
-		}
-	}
 	return false, ""
 }
 
-// RecordSACCall identifies and records a call to a Stellar Asset Contract (#1210).
-// If the contractID or method matches the SAC interface the event is tagged with
-// event_type "sac_call" so downstream consumers can distinguish SAC interactions
-// from arbitrary custom contract calls.
+// RecordSACCall identifies and records a call to a known Stellar Asset Contract (#1210).
+// Only calls whose contractID matches a known built-in SAC are tagged with
+// event_type "sac_call" so downstream consumers can distinguish verified SAC
+// interactions from arbitrary custom contract calls.
 func (t *Tracker) RecordSACCall(accountID, contractID, method string, params []string, result string, err error) {
 	isSAC, assetLabel := isSACContract(contractID, method)
 
