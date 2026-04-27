@@ -20,6 +20,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
+var Version = "dev"
+
 // Network types for Stellar
 type Network string
 
@@ -55,6 +57,15 @@ func (t *authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		// Add Bearer token to Authorization header
 		req.Header.Set("Authorization", "Bearer "+t.token)
 	}
+	return t.transport.RoundTrip(req)
+}
+
+type uaTransport struct {
+	transport http.RoundTripper
+}
+
+func (t *uaTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.Header.Set("User-Agent", "ERST-SDK/"+Version)
 	return t.transport.RoundTrip(req)
 }
 
@@ -165,10 +176,14 @@ func createHTTPClient(token string) *http.Client {
 	var baseTransport http.RoundTripper = http.DefaultTransport
 
 	var transport http.RoundTripper = baseTransport
+	
+	// Add user-agent transport
+	transport = &uaTransport{transport: transport}
+	
 	if token != "" {
 		transport = &authTransport{
 			token:     token,
-			transport: baseTransport,
+			transport: transport,
 		}
 	}
 
