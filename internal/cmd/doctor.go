@@ -26,6 +26,25 @@ func joinPath(parts ...string) string {
 	return strings.Join(parts, "/")
 }
 
+// FriendlyPath replaces the user's home directory with ~ for better readability
+func FriendlyPath(path string) string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return path
+	}
+
+	// Normalize both paths to use forward slashes for comparison
+	normalizedPath := filepath.ToSlash(path)
+	normalizedHomeDir := filepath.ToSlash(homeDir)
+
+	// Replace home directory with ~
+	if strings.HasPrefix(normalizedPath, normalizedHomeDir) {
+		return "~" + strings.TrimPrefix(normalizedPath, normalizedHomeDir)
+	}
+
+	return path
+}
+
 // DependencyID is a unique identifier for each dependency (Issue #8: type-safe dispatch)
 type DependencyID string
 
@@ -126,7 +145,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		fmt.Println()
 
 		if verbose && dep.Path != "" {
-			fmt.Printf("  Path: %s\n", dep.Path)
+			fmt.Printf("  Path: %s\n", FriendlyPath(dep.Path))
 		}
 
 		if !dep.Installed && dep.FixHint != "" {
