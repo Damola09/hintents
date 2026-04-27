@@ -158,7 +158,8 @@ func GenerateCallGraphSVG(root *decoder.CallNode) string {
 		<text x="12" y="40" class="node-sub">%s</text>
 		<text x="12" y="60" class="node-metric" fill="var(--cpu)">CPU: %d</text>
 		<text x="100" y="60" class="node-metric" fill="var(--mem)">Mem: %s</text>
-	</g>`, gasLevel(node.CPUInstructions), x, y, nodeWidth, nodeHeight, node.Function, contractShort, node.CPUInstructions, formatBytes(node.MemoryBytes))
+		<text x="12" y="78" class="node-metric" fill="var(--text-mute)">Elapsed: %s</text>
+	</g>`, gasLevel(node.CPUInstructions), x, y, nodeWidth, nodeHeight, node.Function, contractShort, node.CPUInstructions, formatBytes(node.MemoryBytes), formatElapsedPerCall(node))
 	}
 
 	// Legend footer
@@ -177,6 +178,31 @@ func GenerateCallGraphSVG(root *decoder.CallNode) string {
 
 	sb.WriteString("</svg>")
 	return sb.String()
+}
+
+func formatElapsedPerCall(node *decoder.CallNode) string {
+	for _, event := range node.Events {
+		if event.Data == "" {
+			continue
+		}
+		m := elapsedPattern.FindStringSubmatch(event.Data)
+		if len(m) < 3 {
+			continue
+		}
+		unit := strings.ToLower(strings.TrimSpace(m[1]))
+		valueRaw := strings.TrimSpace(m[2])
+		if valueRaw == "" {
+			continue
+		}
+		if unit == "" {
+			unit = "ms"
+		}
+		if _, err := strconv.ParseFloat(valueRaw, 64); err != nil {
+			continue
+		}
+		return valueRaw + unit
+	}
+	return "n/a"
 }
 
 func gasLevel(cpu uint64) string {
